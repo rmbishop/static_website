@@ -1,44 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
-Source: Claude 3.5 Sonnet<br>
-Query: Show me two graphs that plot the same data.  The first graph has noise in it, and the second graph is filtered.<br>
-Add a textbox that contains the filter code that is run for the filter.  There should be an update button below the text<br>
-box that updates the filtered graph using the function within the textbox.   Include all of the necessary html boilerplate<br>
-to allow this application to run as a static .html file.   The initial function within the textbox should use a running<br>
-average filter that uses a window of 5 samples.  I want to be able to zoom in and out of the graphs.<br>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Signal Filter Visualization</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.2/plotly.min.js"></script>
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
     <style>
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        body {
+            margin: 0;
             padding: 20px;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
         }
-        #filterCode {
-            width: 100%;
-            height: 150px;
-            font-family: monospace;
-            margin: 20px 0;
-            padding: 10px;
+        .container {
+            display: flex;
+            height: calc(100vh - 40px);
+            position: relative;
+        }
+        .editor-pane {
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 10px;
+        }
+        .graphs-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-left: 10px;
+            min-width: 200px;
+        }
+        .resizer {
+            width: 8px;
+            background: #f0f0f0;
+            cursor: col-resize !important;
+            margin: 0 -4px;
+            border-left: 1px solid #ccc;
+            border-right: 1px solid #ccc;
+        }
+        .resizer:hover {
+            background: #ddd;
+        }
+        .editor-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .CodeMirror {
+            flex-grow: 1;
+            height: 100%;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+        }
+        /* Custom cursor color for CodeMirror */
+        .CodeMirror-cursor {
+            border-left: 2px solid rgb(255, 255, 255) !important;
         }
         #updateButton {
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: 16px;
             cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        #updateButton:hover {
+            background-color: #45a049;
         }
         .plot {
-            margin-bottom: 20px;
+            flex: 1;
+            min-height: 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="noisyPlot" class="plot"></div>
-        <div id="filteredPlot" class="plot"></div>
-        <textarea id="filterCode">
+        <div class="editor-pane">
+            <div class="editor-container">
+                <textarea id="filterCode">
 function applyFilter(data) {
     // Running average filter with window size 5
     const windowSize = 5;
@@ -59,10 +110,64 @@ function applyFilter(data) {
     
     return result;
 }</textarea>
-        <button id="updateButton">Update Filter</button>
+            </div>
+            <button id="updateButton">Update Filter</button>
+        </div>
+        <div class="resizer"></div>
+        <div class="graphs-pane">
+            <div id="noisyPlot" class="plot"></div>
+            <div id="filteredPlot" class="plot"></div>
+        </div>
     </div>
 
     <script>
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById("filterCode"), {
+            mode: "javascript",
+            theme: "monokai",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            lineWrapping: true
+        });
+
+        // Resizer functionality
+        const resizer = document.querySelector('.resizer');
+        const leftPane = document.querySelector('.editor-pane');
+        let x = 0;
+        let leftWidth = 0;
+
+        const mouseDownHandler = (e) => {
+            x = e.clientX;
+            leftWidth = leftPane.getBoundingClientRect().width;
+
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
+        };
+
+        const mouseMoveHandler = (e) => {
+            const dx = e.clientX - x;
+            const newLeftWidth = leftWidth + dx;
+            
+            if (newLeftWidth > 200 && newLeftWidth < window.innerWidth - 400) {
+                leftPane.style.width = `${newLeftWidth}px`;
+                editor.refresh();
+            }
+
+            Plotly.Plots.resize('noisyPlot');
+            Plotly.Plots.resize('filteredPlot');
+        };
+
+        const mouseUpHandler = () => {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+        };
+
+        resizer.addEventListener('mousedown', mouseDownHandler);
+
         // Generate sample data with noise
         function generateData() {
             const x = Array.from({length: 200}, (_, i) => i * 0.1);
@@ -88,16 +193,17 @@ function applyFilter(data) {
         const noisyLayout = {
             title: 'Noisy Signal',
             xaxis: { title: 'Time' },
-            yaxis: { title: 'Amplitude' }
+            yaxis: { title: 'Amplitude' },
+            margin: { t: 40, r: 30, l: 60, b: 40 }
         };
 
-        Plotly.newPlot('noisyPlot', [noisyTrace], noisyLayout);
+        Plotly.newPlot('noisyPlot', [noisyTrace], noisyLayout, {responsive: true});
 
         // Function to update filtered plot
         function updateFilteredPlot() {
             try {
-                // Get the filter function from textarea
-                const filterFunc = new Function('return ' + document.getElementById('filterCode').value)();
+                // Get the filter function from CodeMirror
+                const filterFunc = new Function('return ' + editor.getValue())();
                 
                 // Apply filter
                 const filteredY = filterFunc(data.y);
@@ -113,10 +219,11 @@ function applyFilter(data) {
                 const filteredLayout = {
                     title: 'Filtered Signal',
                     xaxis: { title: 'Time' },
-                    yaxis: { title: 'Amplitude' }
+                    yaxis: { title: 'Amplitude' },
+                    margin: { t: 40, r: 30, l: 60, b: 40 }
                 };
 
-                Plotly.newPlot('filteredPlot', [filteredTrace], filteredLayout);
+                Plotly.newPlot('filteredPlot', [filteredTrace], filteredLayout, {responsive: true});
             } catch (error) {
                 alert('Error in filter function: ' + error.message);
             }
@@ -127,6 +234,13 @@ function applyFilter(data) {
 
         // Add event listener to update button
         document.getElementById('updateButton').addEventListener('click', updateFilteredPlot);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            editor.refresh();
+            Plotly.Plots.resize('noisyPlot');
+            Plotly.Plots.resize('filteredPlot');
+        });
     </script>
 </body>
 </html>
