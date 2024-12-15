@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+Source: Claude 3.5 Sonnet<br>
+Query: Show me two graphs that plot the same data.  The first graph has noise in it, and the second graph is filtered.<br>
+Add a textbox that contains the filter code that is run for the filter.  There should be an update button below the text<br>
+box that updates the filtered graph using the function within the textbox.   Include all of the necessary html boilerplate<br>
+to allow this application to run as a static .html file.   The initial function within the textbox should use a running<br>
+average filter that uses a window of 5 samples.  I want to be able to zoom in and out of the graphs.<br>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Filter Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.2/plotly.min.js"></script>
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #filterCode {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            margin: 20px 0;
+            padding: 10px;
+        }
+        #updateButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .plot {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="noisyPlot" class="plot"></div>
+        <div id="filteredPlot" class="plot"></div>
+        <textarea id="filterCode">
+function applyFilter(data) {
+    // Running average filter with window size 5
+    const windowSize = 5;
+    let result = [];
+    
+    for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        let count = 0;
+        
+        for (let j = Math.max(0, i - Math.floor(windowSize/2)); 
+             j <= Math.min(data.length - 1, i + Math.floor(windowSize/2)); j++) {
+            sum += data[j];
+            count++;
+        }
+        
+        result.push(sum / count);
+    }
+    
+    return result;
+}</textarea>
+        <button id="updateButton">Update Filter</button>
+    </div>
+
+    <script>
+        // Generate sample data with noise
+        function generateData() {
+            const x = Array.from({length: 200}, (_, i) => i * 0.1);
+            const y = x.map(val => 
+                Math.sin(val) + 
+                0.5 * Math.sin(2.5 * val) +
+                0.2 * (Math.random() - 0.5)
+            );
+            return { x, y };
+        }
+
+        // Initial data
+        const data = generateData();
+
+        // Create noisy plot
+        const noisyTrace = {
+            x: data.x,
+            y: data.y,
+            type: 'scatter',
+            name: 'Noisy Signal'
+        };
+
+        const noisyLayout = {
+            title: 'Noisy Signal',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Amplitude' }
+        };
+
+        Plotly.newPlot('noisyPlot', [noisyTrace], noisyLayout);
+
+        // Function to update filtered plot
+        function updateFilteredPlot() {
+            try {
+                // Get the filter function from textarea
+                const filterFunc = new Function('return ' + document.getElementById('filterCode').value)();
+                
+                // Apply filter
+                const filteredY = filterFunc(data.y);
+                
+                // Create filtered plot
+                const filteredTrace = {
+                    x: data.x,
+                    y: filteredY,
+                    type: 'scatter',
+                    name: 'Filtered Signal'
+                };
+
+                const filteredLayout = {
+                    title: 'Filtered Signal',
+                    xaxis: { title: 'Time' },
+                    yaxis: { title: 'Amplitude' }
+                };
+
+                Plotly.newPlot('filteredPlot', [filteredTrace], filteredLayout);
+            } catch (error) {
+                alert('Error in filter function: ' + error.message);
+            }
+        }
+
+        // Initial filtered plot
+        updateFilteredPlot();
+
+        // Add event listener to update button
+        document.getElementById('updateButton').addEventListener('click', updateFilteredPlot);
+    </script>
+</body>
+</html>
