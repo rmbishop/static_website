@@ -12,6 +12,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
     <style>
+        .editor-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #filterSelect {
+            flex-grow: 1;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #filterSelect:hover {
+            border-color: #888;
+        }        
         body {
             margin: 0;
             padding: 20px;
@@ -88,10 +104,30 @@
 <body>
     <div class="container">
         <div class="editor-pane">
+            <div class="editor-controls">
+                <select id="filterSelect">
+                    <option value="movingAverage">Moving Average Filter</option>
+                    <option value="IIR">IIR</option>
+                </select>
+            </div>
             <div class="editor-container">
-                <textarea id="filterCode">
-function applyFilter(data) {
-    // Running average filter with window size 5
+                <textarea id="filterCode"></textarea>
+            </div>
+            <button id="updateButton">Update Filter</button>
+        </div>
+        <div class="resizer"></div>
+        <div class="graphs-pane">
+            <div id="noisyPlot" class="plot"></div>
+            <div id="filteredPlot" class="plot"></div>
+        </div>
+    </div>
+
+    <script>
+        // Preset filter functions
+        const filterPresets = {
+            movingAverage: 
+`function applyFilter(data) {
+    // Simple moving average filter with window size 5
     const windowSize = 5;
     let result = [];
     
@@ -109,19 +145,53 @@ function applyFilter(data) {
     }
     
     return result;
-}</textarea>
-            </div>
-            <button id="updateButton">Update Filter</button>
-        </div>
-        <div class="resizer"></div>
-        <div class="graphs-pane">
-            <div id="noisyPlot" class="plot"></div>
-            <div id="filteredPlot" class="plot"></div>
-        </div>
-    </div>
+}`,
+            IIR:
+`function applyFilter(data) {
+    // Running average filter with window size 5
+    const windowSize = 5;
+    let result = [];
+    let filteredValue = 0;   
+ 
+    for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        let count = 0;
+        
+        if(i == 0) {
+           filteredValue = data[i];
+        }
+        else {
+           filteredValue = (((windowSize-1)/windowSize) * filteredValue) + ((1/windowSize) * data[i]); 
+        }
 
-    <script>
-        // Initialize CodeMirror
+        result.push(filteredValue);
+    }
+    
+    return result;
+}`,
+            median:
+`function applyFilter(data) {
+    // Median filter with window size 5
+    const windowSize = 5;
+    let result = [];
+    
+    for (let i = 0; i < data.length; i++) {
+        let window = [];
+        
+        for (let j = Math.max(0, i - Math.floor(windowSize/2)); 
+             j <= Math.min(data.length - 1, i + Math.floor(windowSize/2)); j++) {
+            window.push(data[j]);
+        }
+        
+        window.sort((a, b) => a - b);
+        result.push(window[Math.floor(window.length/2)]);
+    }
+    
+    return result;
+}`
+        };
+
+        // Initialize CodeMirror with the default filter
         const editor = CodeMirror.fromTextArea(document.getElementById("filterCode"), {
             mode: "javascript",
             theme: "monokai",
@@ -133,6 +203,17 @@ function applyFilter(data) {
             indentWithTabs: false,
             lineWrapping: true
         });
+
+        // Set initial filter
+        editor.setValue(filterPresets.movingAverage);
+
+        // Add event listener for filter selection
+        document.getElementById('filterSelect').addEventListener('change', (e) => {
+            const selectedFilter = filterPresets[e.target.value];
+            editor.setValue(selectedFilter);
+            updatePlots();
+        });
+
 
         // Resizer functionality
         const resizer = document.querySelector('.resizer');
