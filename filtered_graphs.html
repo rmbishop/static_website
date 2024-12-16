@@ -93,6 +93,19 @@
         #updateButton:hover {
             background-color: #45a049;
         }
+        #regenerateDataButton {
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        #regenerateDataButton:hover {
+            background-color: #45a049;
+        }        
         .plot {
             flex: 1;
             min-height: 0;
@@ -114,6 +127,7 @@
                 <textarea id="filterCode"></textarea>
             </div>
             <button id="updateButton">Update Filter</button>
+            <button id="regenerateDataButton">Regenerate Data</button>
         </div>
         <div class="resizer"></div>
         <div class="graphs-pane">
@@ -259,10 +273,10 @@
         }
 
         // Initial data
-        const data = generateData();
+        let data = generateData();
 
         // Create noisy plot
-        const noisyTrace = {
+        let noisyTrace = {
             x: data.x,
             y: data.y,
             type: 'scatter',
@@ -275,6 +289,17 @@
             yaxis: { title: 'Amplitude' },
             margin: { t: 40, r: 30, l: 60, b: 40 }
         };
+
+        function regenerateData() {
+            data = generateData();
+            noisyTrace = {
+                x: data.x,
+                y: data.y,
+                type: 'scatter',
+                name: 'Noisy Signal'
+            };            
+            updateFilteredPlot();
+        }
 
 
         // Function to update filtered plot
@@ -305,6 +330,7 @@
 
         // Add event listener to update button
         document.getElementById('updateButton').addEventListener('click', updateFilteredPlot);
+        document.getElementById('regenerateDataButton').addEventListener('click', regenerateData);
 
         // Handle window resize
         window.addEventListener('resize', () => {
