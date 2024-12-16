@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oscilloscope Simulator</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .oscilloscope {
+            background-color: #000;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #2a2a2a;
+            background-color: #001100;
+        }
+        .controls {
+            margin-top: 20px;
+            color: #0f0;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        label {
+            margin-right: 5px;
+        }
+        input {
+            background-color: #333;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 5px;
+            border-radius: 3px;
+            width: 60px;
+        }
+        #samples {
+            color: #0f0;
+            margin-top: 20px;
+            font-family: monospace;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="oscilloscope">
+        <canvas id="scope" width="600" height="400"></canvas>
+        <div class="controls">
+            <div>
+                <label for="noise">Noise:</label>
+                <input type="text" id="noise" value="20">
+            </div>
+            <div>
+                <label for="samplesPerCycle">Samples/Cycle:</label>
+                <input type="text" id="samplesPerCycle" value="10">
+            </div>
+        </div>
+        <div id="samples"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('scope');
+        const ctx = canvas.getContext('2d');
+        const noiseInput = document.getElementById('noise');
+        const samplesPerCycleInput = document.getElementById('samplesPerCycle');
+        const samplesDisplay = document.getElementById('samples');
+
+        let time = 0;
+        const points = [];
+        const maxPoints = 600;
+        const frequency = 1; // Fixed at 1 Hz
+        let lastSampleTime = 0;
+        let currentCycle = 0;
+        let sampleCount = 0;
+
+        function readSample(value) {
+            samplesDisplay.innerHTML = `Sample ${sampleCount}: ${value.toFixed(3)}<br>` + samplesDisplay.innerHTML;
+            if (samplesDisplay.childNodes.length > 50) {
+                samplesDisplay.lastChild.remove();
+            }
+        }
+
+        function addNoise(value, noiseAmount) {
+            const noise = (Math.random() - 0.5) * 2 * (noiseAmount / 100);
+            return value + noise;
+        }
+
+        function drawScope() {
+            // Clear the canvas
+            ctx.fillStyle = '#001100';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 0.5;
+            ctx.globalAlpha = 0.2;
+
+            // Vertical grid lines
+            for (let x = 0; x <= canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Horizontal grid lines
+            for (let y = 0; y <= canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw waveform
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            points.forEach((point, index) => {
+                if (index === 0) {
+                    ctx.moveTo(index, point);
+                } else {
+                    ctx.lineTo(index, point);
+                }
+            });
+
+            ctx.stroke();
+        }
+
+        function updateWaveform() {
+            const noiseAmount = parseFloat(noiseInput.value) || 20;
+            const samplesPerCycle = parseInt(samplesPerCycleInput.value) || 10;
+            
+            // Calculate sine wave value
+            const value = Math.sin(2 * Math.PI * frequency * time);
+            const noisyValue = addNoise(value, noiseAmount);
+            
+            // Scale and shift the value to fit the canvas
+            const scaledValue = (noisyValue * 150) + canvas.height / 2;
+
+            // Check if we need to take a sample
+            const cyclePeriod = 1 / frequency;
+            const currentTime = time % cyclePeriod;
+            const sampleInterval = cyclePeriod / samplesPerCycle;
+            
+            if (currentTime < lastSampleTime) {
+                currentCycle++;
+                sampleCount = 0;
+            }
+            
+            if (sampleCount < samplesPerCycle && 
+                currentTime >= (sampleInterval * sampleCount)) {
+                readSample(noisyValue);
+                sampleCount++;
+            }
+            
+            lastSampleTime = currentTime;
+
+            points.push(scaledValue);
+            if (points.length > maxPoints) {
+                points.shift();
+            }
+
+            time += 0.01;
+            drawScope();
+            requestAnimationFrame(updateWaveform);
+        }
+
+        // Input validation
+        noiseInput.addEventListener('input', function() {
+            let value = parseFloat(this.value);
+            if (isNaN(value)) value = 20;
+            if (value < 0) value = 0;
+            if (value > 100) value = 100;
+            this.value = value;
+        });
+
+        samplesPerCycleInput.addEventListener('input', function() {
+            let value = parseInt(this.value);
+            if (isNaN(value) || value < 1) value = 1;
+            this.value = value;
+        });
+
+        // Start the animation
+        updateWaveform();
+    </script>
+</body>
+</html>
